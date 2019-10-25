@@ -1098,6 +1098,9 @@ def test_np_get_dtype():
             assert type(mx_arr.dtype) == type(np_arr.dtype)
 
 
+
+
+
 if __name__ == '__main__':
     import nose
     nose.runmodule()
