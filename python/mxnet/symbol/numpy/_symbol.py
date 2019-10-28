@@ -4649,10 +4649,11 @@ def nan_to_num(x, copy=True, nan=0.0, posinf=None, neginf=None):
     """
     if isinstance(x, numeric_types):
         return _np.nan_to_num(x, copy, nan, posinf, neginf)
-    elif isinstance(x. NDArray):
-        return _npi.nan_to_num(x, copy, nan, posinf, neginf)
+    elif isinstance(x, _Symbol):
+        if copy == False:
+            return _npi.nan_to_num(x, copy=copy, nan=nan, posinf=posinf, neginf=neginf, out=x)
+        return _npi.nan_to_num(x, copy=copy, nan=nan, posinf=posinf, neginf=neginf, out=None) 
     else:
         raise TypeError('type {} not supported'.format(str(type(x))))
-
 
 _set_np_symbol_class(_Symbol)
