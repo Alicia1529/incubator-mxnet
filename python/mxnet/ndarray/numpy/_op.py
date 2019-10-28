@@ -4852,10 +4852,6 @@ def nan_to_num(x, copy=True, nan=0.0, posinf=None, neginf=None, **kwargs):
     if isinstance(x, numeric_types):
         return _np.nan_to_num(x, copy, nan, posinf, neginf)
     elif isinstance(x, NDArray):
-        if posinf == None:
-            posinf = float("inf")
-        if neginf == None:
-            neginf = float("-inf")
         return _npi.nan_to_num(x, copy, nan, posinf, neginf)
     else:
         raise TypeError('type {} not supported'.format(str(type(x))))

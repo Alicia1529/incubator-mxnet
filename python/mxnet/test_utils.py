@@ -550,6 +550,7 @@ def assert_almost_equal(a, b, rtol=None, atol=None, names=('a', 'b'), equal_nan=
     mismatches : tuple of mismatches
         Maximum number of mismatches to be printed (mismatches[0]) and determine (mismatches[1])
     """
+    print("///////////////////a:",a,b)
     if not use_broadcast:
         checkShapes(a, b)
 

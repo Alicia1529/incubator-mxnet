@@ -3450,6 +3450,98 @@ def test_np_einsum():
                     assert_almost_equal(grad[0][iop], grad[1][iop], rtol=rtol, atol=atol)
 
 
+@with_seed()
+@use_np
+def test_np_nan_to_num():
+    class TestNanToNum(HybridBlock):
+        def __init__(self, copy=True, nan=0.0, posinf=None, neginf=None):
+            super(TestNanToNum, self).__init__()
+            self.copy = copy
+            self.nan = nan
+            self.posinf = posinf
+            self.neginf = neginf
+            # necessary initializations
+            
+        def hybrid_forward(self, F, a):
+            return F.np.nan_to_num(a, self.copy, self.nan, self.posinf, self.neginf)
+    
+    # objects = [
+    #     -1,
+    #     0,
+    #     1,
+    #     [-1, 0, 1],
+    #     [[-1, 0, 1], [-1, 0, 1]]
+    # ]
+    objects = [
+        _np.nan,
+        _np.inf,
+        -_np.inf,
+        [_np.nan],
+        [_np.inf],
+        [-_np.inf],
+        [-1, 0, 1],
+        [[-1, 0, 1], [-1, 0, 1]]
+    ][5:]
+
+    dtypes = ['float16', 'float32', 'float64']
+    dic = {"nan":[0, 0.0, 1, 1.0, 1.1], "inf":[0,0.0,1000,1000.0,1.7976931348623157e+308],"-inf":[0,0.0,-1000,-1000.0,-1.7976931348623157e+308]}
+    
+    atol, rtol = 1e-5, 1e-3
+
+    for hybridize in [True, False]:
+        for src in objects:
+            for dtype in dtypes:
+                for copy in [True, False]:
+                    for idx in range(1):
+                        test_np_nan_to_num = TestNanToNum(copy=copy, nan=dic["nan"][idx], posinf=dic["inf"][idx], neginf=dic["-inf"][idx])
+                        if hybridize:
+                            test_np_nan_to_num.hybridize()
+                        x1 = mx.nd.array(src, dtype=dtype).as_np_ndarray().asnumpy()
+                        x2 = mx.nd.array(src, dtype=dtype).as_np_ndarray()
+                        x2.attach_grad()
+                        print("x1",x1)
+                        print(type(x1))
+                        print("x2",x2)
+                        print(type(x2))
+                        print()
+
+                        np_out = _np.nan_to_num(x1, copy, dic["nan"][idx], dic["inf"][idx], dic["-inf"][idx])
+                        with mx.autograd.record():
+                            mx_out = test_np_nan_to_num(x2)
+                        print("np_out",np_out)
+                        print("np_out.shape",np_out.shape)
+                        print("np_out.dtype",np_out.dtype)
+                        print("np_out:type",type(np_out))
+                        print()
+                        print("mx_out",mx_out.asnumpy())
+                        print("mx_out.shape",mx_out.shape)
+                        print("mx_out.dtype",mx_out.dtype)
+                        print("mx_out:type",type(mx_out.asnumpy()))
+
+                        assert mx_out.shape == np_out.shape
+                        assert mx_out.dtype == np_out.dtype
+                        print("===",mx_out.asnumpy(), np_out,mx_out.asnumpy()== np_out)
+                        
+                        assert_almost_equal(mx_out.asnumpy(), np_out, rtol, atol)
+                        # mx_out.backward()
+                        # if copy == False:
+                        #     assert x1.shape == x2.shape
+                        #     assert x1.dtype == x2.dtype
+                        #     assert_almost_equal(x1, x2, rtol=rtol, atol=atol)  
+
+                        # # test numeric
+                        # if dtype == 'float32':
+                        #     x_sym = mx.sym.Variable("x").as_np_ndarray()
+                        #     mx_sym = mx.sym.np.prod(x_sym).as_nd_ndarray()
+                        #     check_numeric_gradient(mx_sym, [x.as_nd_ndarray()],
+                        #                            numeric_eps=1e-3, rtol=1e-3, atol=1e-4, dtype=_np.float32)
+
+                        # # test imperative
+                        # np_out = _np.nan_to_num(x1)
+                        # mx_out = np.nan_to_num(x2)
+                       
+                        # assert_almost_equal(mx_out.asnumpy(), np_out, rtol=1e-3, atol=1e-5, use_broadcast=False)
+
 if __name__ == '__main__':
     import nose
     nose.runmodule()

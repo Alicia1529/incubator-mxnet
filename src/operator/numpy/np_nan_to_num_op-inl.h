@@ -98,7 +98,7 @@ namespace isnan_typed {
 namespace mxnet {
 namespace op {
 
-
+// template<typename DType>   
 struct NumpyNanToNumParam : public dmlc::Parameter<NumpyNanToNumParam> {
   bool copy; 
   float nan, posinf, neginf; 
@@ -124,7 +124,8 @@ inline bool NumpyNanToNumOpType(const nnvm::NodeAttrs& attrs,
   CHECK_EQ(in_attrs->size(), 1U);
   CHECK_EQ(out_attrs->size(), 1U);
 
-  TYPE_ASSIGN_CHECK(*out_attrs, 0, mshadow::kFloat32);
+  TYPE_ASSIGN_CHECK(*out_attrs, 0, in_attrs->at(0));
+  TYPE_ASSIGN_CHECK(*in_attrs, 0, out_attrs->at(0));
   return out_attrs->at(0) != -1;
 };
 
@@ -134,8 +135,10 @@ struct nan_to_num_forward {
   MSHADOW_XINLINE static void Map(int i, DType* out_data, const DType* in_data, const float nan, const float posinf, const float neginf) {
     DType val = in_data[i];
     if (isnan_typed::IsNan<DType>(val))  val = nan;
-    if (val > 0 && isinf_typed::IsInf(val))  val = posinf;
-    if (val < 0 && isinf_typed::IsInf(val))  val = neginf;
+    // if (val > 0 && isinf_typed::IsInf(val))  val = posinf;
+    // if (val < 0 && isinf_typed::IsInf(val))  val = neginf;
+    if (val > 0 && isinf_typed::IsInf(val))  val = mshadow::red::limits::MaxValue<float>();
+    if (val < 0 && isinf_typed::IsInf(val))  val = mshadow::red::limits::MinValue<float>();
     KERNEL_ASSIGN(out_data[i], req, val);
   }
 };
