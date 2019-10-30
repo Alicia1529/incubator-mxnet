@@ -70,7 +70,7 @@ namespace isinf_typed {
 
   template<>
   MSHADOW_XINLINE bool IsInf(volatile mshadow::half::half_t val) {
-    return (val.half_ & 0x7fff) > 0x7c00;
+    return (val.half_ & 0x7fff) >= 0x7c00;
   }
 };  // namespace isinf_typed
 
@@ -91,17 +91,21 @@ namespace isnan_typed {
   MSHADOW_XINLINE bool IsNan(volatile long double val) {
     return isnan(val);
   }
-};
 
+  template<>
+  MSHADOW_XINLINE bool IsNan(volatile mshadow::half::half_t val) {
+    return (val.half_ & 0x7fff) > 0x7c00;
+  }
+};  // namespace isnan_typed
 
 
 namespace mxnet {
 namespace op {
 
-// template<typename DType>   
 struct NumpyNanToNumParam : public dmlc::Parameter<NumpyNanToNumParam> {
   bool copy; 
-  float nan, posinf, neginf; 
+  double nan;
+  dmlc::optional<double> posinf, neginf; 
   DMLC_DECLARE_PARAMETER(NumpyNanToNumParam) {
     DMLC_DECLARE_FIELD(copy)
     .set_default(true)
@@ -110,10 +114,10 @@ struct NumpyNanToNumParam : public dmlc::Parameter<NumpyNanToNumParam> {
     .set_default(0.0)
     .describe("");
     DMLC_DECLARE_FIELD(posinf)
-    .set_default(mshadow::red::limits::MaxValue<float>())
+    .set_default(dmlc::optional<double>())
     .describe("");
     DMLC_DECLARE_FIELD(neginf)
-    .set_default(mshadow::red::limits::MinValue<float>())
+    .set_default(dmlc::optional<double>())
     .describe("");
   }
 };
@@ -132,13 +136,12 @@ inline bool NumpyNanToNumOpType(const nnvm::NodeAttrs& attrs,
 template<int req>
 struct nan_to_num_forward {
   template<typename DType>
-  MSHADOW_XINLINE static void Map(int i, DType* out_data, const DType* in_data, const float nan, const float posinf, const float neginf) {
+  MSHADOW_XINLINE static void Map(int i, DType* out_data, const DType* in_data, const DType nan, const DType posinf, const DType neginf) {
     DType val = in_data[i];
     if (isnan_typed::IsNan<DType>(val))  val = nan;
-    // if (val > 0 && isinf_typed::IsInf(val))  val = posinf;
-    // if (val < 0 && isinf_typed::IsInf(val))  val = neginf;
-    if (val > 0 && isinf_typed::IsInf(val))  val = mshadow::red::limits::MaxValue<float>();
-    if (val < 0 && isinf_typed::IsInf(val))  val = mshadow::red::limits::MinValue<float>();
+    if (val > 0 && isinf_typed::IsInf(val))  val = posinf;
+    if (val < 0 && isinf_typed::IsInf(val))  val = neginf;
+
     KERNEL_ASSIGN(out_data[i], req, val);
   }
 };
@@ -158,11 +161,16 @@ void NumpyNanToNumOpForward(const nnvm::NodeAttrs& attrs,
   const TBlob& out_data = outputs[0];
   const NumpyNanToNumParam& param = nnvm::get<NumpyNanToNumParam>(attrs.parsed);
   using namespace mxnet_op;
+  
   MSHADOW_TYPE_SWITCH(out_data.type_flag_, DType, {
+    DType defaultnan = static_cast<DType>(param.nan) ;
+    DType posinf = (param.posinf.has_value()) ? static_cast<DType>(param.posinf.value()) : mshadow::red::limits::MaxValue<DType>();
+    DType neginf = (param.neginf.has_value()) ? static_cast<DType>(param.neginf.value()) : mshadow::red::limits::MinValue<DType>();
+
     MXNET_ASSIGN_REQ_SWITCH(req[0], req_type, {
       Kernel<nan_to_num_forward<req_type>, xpu>::Launch(
           s, out_data.Size(), out_data.dptr<DType>(), in_data.dptr<DType>(),
-          param.nan, param.posinf, param.neginf);
+          defaultnan, posinf, neginf);
     });
   });
 }
@@ -171,8 +179,8 @@ template<int req>
 struct nan_to_num_backward {
   template<typename DType>
   MSHADOW_XINLINE static void Map(int i, DType* in_grad, const DType* out_grad,
-                                  const DType* in_data, const float nan, const float posinf, const float neginf) {
-    int val = 1;
+                                  const DType* in_data) {
+    int val = 1*out_grad[i];
     if (isnan_typed::IsNan(in_data[i]))  val = 0;
     if (val > 0 && isinf_typed::IsInf(in_data[i]))  val = 0;
     if (val < 0 && isinf_typed::IsInf(in_data[i]))  val = 0;
@@ -192,13 +200,12 @@ void NumpyNanToNumOpBackward(const nnvm::NodeAttrs& attrs,
   const TBlob& out_grad = inputs[0];
   const TBlob& in_data = inputs[1];
   const TBlob& in_grad = outputs[0];
-  const NumpyNanToNumParam& param = nnvm::get<NumpyNanToNumParam>(attrs.parsed);
   using namespace mxnet_op;
   MSHADOW_TYPE_SWITCH(out_grad.type_flag_, DType, {//fixme out out_grad?->ind_data??
     MXNET_ASSIGN_REQ_SWITCH(req[0], req_type, {
       Kernel<nan_to_num_backward<req_type>, xpu>::Launch(
           s, in_grad.Size(), in_grad.dptr<DType>(), out_grad.dptr<DType>(),
-          in_data.dptr<DType>(), param.nan, param.posinf, param.neginf);
+          in_data.dptr<DType>());
     });
   });
 }
