@@ -33,10 +33,14 @@
 #include "../operator_common.h"
 #include "../contrib/boolean_mask-inl.h"
 
+#include "../../common/utils.h"
+
 #include <dmlc/optional.h>
 #include <dmlc/parameter.h>
 #include <mxnet/operator_util.h>
-#include <vector>
+#include <utility>
+#include <algorithm>
+#include <climits>
 #include "../mshadow_op.h"
 #include "../mxnet_op.h"
 #include "../operator_common.h"
@@ -137,11 +141,11 @@ template<int req>
 struct nan_to_num_forward {
   template<typename DType>
   MSHADOW_XINLINE static void Map(int i, DType* out_data, const DType* in_data, const DType nan, const DType posinf, const DType neginf) {
+
     DType val = in_data[i];
     if (isnan_typed::IsNan<DType>(val))  val = nan;
     if (val > 0 && isinf_typed::IsInf(val))  val = posinf;
     if (val < 0 && isinf_typed::IsInf(val))  val = neginf;
-
     KERNEL_ASSIGN(out_data[i], req, val);
   }
 };
@@ -153,6 +157,9 @@ void NumpyNanToNumOpForward(const nnvm::NodeAttrs& attrs,
                         const std::vector<OpReqType>& req,
                         const std::vector<TBlob>& outputs) {
   using namespace mxnet;
+
+
+
   CHECK_EQ(inputs.size(), 1U);
   CHECK_EQ(outputs.size(), 1U);
   CHECK_EQ(req.size(), 1U);
@@ -161,8 +168,10 @@ void NumpyNanToNumOpForward(const nnvm::NodeAttrs& attrs,
   const TBlob& out_data = outputs[0];
   const NumpyNanToNumParam& param = nnvm::get<NumpyNanToNumParam>(attrs.parsed);
   using namespace mxnet_op;
+
+  if (!common::is_float(in_data.type_flag_)) return;
   
-  MSHADOW_TYPE_SWITCH(out_data.type_flag_, DType, {
+  MSHADOW_REAL_TYPE_SWITCH(out_data.type_flag_, DType, {
     DType defaultnan = static_cast<DType>(param.nan) ;
     DType posinf = (param.posinf.has_value()) ? static_cast<DType>(param.posinf.value()) : mshadow::red::limits::MaxValue<DType>();
     DType neginf = (param.neginf.has_value()) ? static_cast<DType>(param.neginf.value()) : mshadow::red::limits::MinValue<DType>();
@@ -201,7 +210,7 @@ void NumpyNanToNumOpBackward(const nnvm::NodeAttrs& attrs,
   const TBlob& in_data = inputs[1];
   const TBlob& in_grad = outputs[0];
   using namespace mxnet_op;
-  MSHADOW_TYPE_SWITCH(out_grad.type_flag_, DType, {//fixme out out_grad?->ind_data??
+  MSHADOW_TYPE_SWITCH(out_grad.type_flag_, DType, {
     MXNET_ASSIGN_REQ_SWITCH(req[0], req_type, {
       Kernel<nan_to_num_backward<req_type>, xpu>::Launch(
           s, in_grad.Size(), in_grad.dptr<DType>(), out_grad.dptr<DType>(),
