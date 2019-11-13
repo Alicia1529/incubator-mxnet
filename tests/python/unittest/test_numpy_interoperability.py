@@ -716,9 +716,16 @@ def _add_workload_var(array_pool):
 
 def _add_workload_zeros_like(array_pool):
     OpArgMngr.add_workload('zeros_like', array_pool['4x1'])
-    OpArgMngr.add_workload('zeros_like', np.random.uniform(size=(3, 3)).astype(np.float64))
-    OpArgMngr.add_workload('zeros_like', np.random.uniform(size=(3, 3)).astype(np.float32))
-    OpArgMngr.add_workload('zeros_like', np.random.randint(2, size = (3, 3)))
+    OpArgMngr.add_workload('zeros_like', np.random.uniform(size=(3, 3)).astype(np.float64), np.int64)
+    OpArgMngr.add_workload('zeros_like', np.random.uniform(size=(3, 3)).astype(np.float32), np.float64)
+    OpArgMngr.add_workload('zeros_like', np.random.randint(2, size = (3, 3)), int)
+
+
+def _add_workload_full_like():
+    OpArgMngr.add_workload('full_like', np.random.uniform(low=0, high=100, size=(1,3,4), dtype='float64'), 1)
+    OpArgMngr.add_workload('full_like', np.random.uniform(low=0, high=100, size=(9,3,1)), 2, np.int64)
+    OpArgMngr.add_workload('full_like', np.random.uniform(low=0, high=100, size=(9,3)), np.nan)
+    OpArgMngr.add_workload('full_like', np.random.uniform(low=0, high=100, size=(0,3)), 0, np.float32)
 
 
 def _add_workload_outer():
@@ -1284,6 +1291,7 @@ def _prepare_workloads():
     _add_workload_less_equal(array_pool)
     _add_workload_diff()
     _add_workload_resize()
+    _add_workload_full_like()
 
 
 _prepare_workloads()

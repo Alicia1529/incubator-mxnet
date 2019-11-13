@@ -3365,6 +3365,49 @@ def test_np_vstack():
 
 @with_seed()
 @use_np
+def test_np_full_like():
+    class TestFullLike(HybridBlock):
+        def __init__(self, fill_value, dtype, ctx):
+            super(TestFullLike, self).__init__()
+            self._fill_value = fill_value
+            self._dtype = dtype
+            self._ctx = ctx
+
+        def hybrid_forward(self, F, x, *args, **kwargs):
+            return F.np.full_like(x, self._fill_value, dtype=self._dtype, ctx=self._ctx)
+
+    dtypes = ['float64', 'float32', 'float16', 'int64', 'int32', 'int8']
+    shapes = [
+        (),
+        (1,),
+        (4, 3),
+        (4, 5),
+        (0, 1),
+        (6, 5, 6),
+        (4, 2, 1, 2),
+        (5, 0, 3, 3),
+        (3, 3, 0, 0),
+    ]
+    fill_values = [0, 1, 2, 3, 4, 5, 6]
+    flags = [True, False]
+    for fill_value, dtype, shape, hybridize in itertools.product(
+        fill_values, dtypes, shapes, flags):
+        param_dtype= _np.random.choice(dtypes)
+        a = np.random.uniform(low=0, high=100, size=shape, dtype='float64').astype(dtype)
+        test = TestFullLike(fill_value, param_dtype, npx.current_context())
+        expected_ret = _np.full_like(a, fill_value=fill_value, dtype=param_dtype)     
+        if hybridize:
+            test.hybridize()
+        ret = test(a)
+        assert_almost_equal(ret.asnumpy(), expected_ret, rtol=1e-3, atol=1e-5)
+
+        # check imperative again
+        ret = np.full_like(a, fill_value, param_dtype)
+        assert_almost_equal(ret.asnumpy(), expected_ret, rtol=1e-3, atol=1e-5)
+
+
+@with_seed()
+@use_np
 def test_np_roll():
     class TestRoll(HybridBlock):
         def __init__(self, shift=None, axis=None):

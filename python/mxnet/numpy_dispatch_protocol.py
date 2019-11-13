@@ -136,6 +136,7 @@ _NUMPY_ARRAY_FUNCTION_LIST = [
     'may_share_memory',
     'diff',
     'resize',
+    'full_like',
 ]
 
 
@@ -231,7 +232,8 @@ _NUMPY_ARRAY_UFUNC_LIST = [
     'less',
     'less_equal',
     'greater',
-    'greater_equal'
+    'greater_equal',
+    'full_like',
 ]
 
 
