@@ -65,9 +65,10 @@ __all__ = ['ndarray', 'empty', 'array', 'shape', 'zeros', 'zeros_like', 'ones', 
 _NDARRAY_UNSUPPORTED_INDEXING = -1
 _NDARRAY_BASIC_INDEXING = 0
 _NDARRAY_ADVANCED_INDEXING = 1
-_NDARRAY_SINGLE_BOOLEAN_INDEXING = 2
-_NDARRAY_INT_BOOLEAN_INDEXING = 3
-_NDARRAY_SLICE_BOOLEAN_INDEXING = 4
+_NDARRAY_EMPTY_TUPLE_INDEXING = 2
+_NDARRAY_SINGLE_BOOLEAN_INDEXING = 3
+_NDARRAY_INT_BOOLEAN_INDEXING = 4
+_NDARRAY_SLICE_BOOLEAN_INDEXING = 5
 
 
 # This function is copied from ndarray.py since pylint
@@ -301,6 +302,19 @@ class ndarray(NDArray):
             return sliced.reshape(tuple(final_shape))
         else:
             return sliced.reshape_view(tuple(final_shape))
+
+    def _get_np_empty_tuple_indexing(self, key):
+        new_shape = []
+        num_none = 0
+        for i, idx in enumerate(key):
+            if idx == None:
+                new_shape.append(1) # expand dimension
+                num_none += 1
+            elif idx == ():
+                new_shape.append(0) # 0 shape
+            elif idx == slice(None, None, None):
+                new_shape.append(self.shape[i - num_none])
+        return empty(new_shape, dtype=self.dtype)
 
     def _get_np_advanced_indexing(self, key):
         idcs, new_axes = self._get_index_nd(key)
@@ -612,7 +626,9 @@ class ndarray(NDArray):
             return self._get_boolean_indexing(key, pos, bool_type)
 
         if ndim == 0:
-            if key != ():
+            if key == 0:
+                return self
+            elif key != ():
                 raise IndexError('scalar tensor can only accept `()` as index')
         # Handle simple cases for higher speed
         if isinstance(key, tuple) and len(key) == 0:
@@ -642,6 +658,8 @@ class ndarray(NDArray):
         indexing_dispatch_code = get_indexing_dispatch_code(key)
         if indexing_dispatch_code == _NDARRAY_BASIC_INDEXING:
             return self._get_np_basic_indexing(key)
+        elif indexing_dispatch_code == _NDARRAY_EMPTY_TUPLE_INDEXING:
+            return self._get_np_empty_tuple_indexing(key)
         elif indexing_dispatch_code == _NDARRAY_ADVANCED_INDEXING:
             return self._get_np_advanced_indexing(key)
         else:
@@ -736,6 +754,8 @@ class ndarray(NDArray):
             indexing_dispatch_code = get_indexing_dispatch_code(slc_key)
             if indexing_dispatch_code == _NDARRAY_BASIC_INDEXING:
                 self._set_nd_basic_indexing(key, value)  # function is inheritated from NDArray class
+            elif indexing_dispatch_code == _NDARRAY_EMPTY_TUPLE_INDEXING:
+                pass # no action needed
             elif indexing_dispatch_code == _NDARRAY_ADVANCED_INDEXING:
                 self._set_np_advanced_indexing(key, value)
             else:
@@ -1061,6 +1081,15 @@ class ndarray(NDArray):
         if context.device_type == 'cpu' or self.ndim == 0:
             return array_str
         return '{array} @{ctx}'.format(array=array_str, ctx=context)
+
+    def __format__(self, fmt):
+        """Return value.__format__(format_spec). Overwrite to include 0-d array"""
+        if self.ndim == 0:
+            return self.item().__format__(fmt)
+        elif len(fmt) == 0:
+            return self.__str__().__format__(fmt)
+        else:
+            raise TypeError("Cannot format mxnet.numpy.ndarray with format_spec")
 
     def attach_grad(self, grad_req='write'):  # pylint: disable=arguments-differ
         """Attach a gradient buffer to this ndarray, so that `backward`

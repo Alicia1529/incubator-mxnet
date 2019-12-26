@@ -110,6 +110,7 @@ _GRAD_REQ_MAP = {
 _NDARRAY_UNSUPPORTED_INDEXING = -1
 _NDARRAY_BASIC_INDEXING = 0
 _NDARRAY_ADVANCED_INDEXING = 1
+_NDARRAY_EMPTY_TUPLE_INDEXING = 2
 
 # Caching whether MXNet was built with INT64 support or not
 _INT64_TENSOR_SIZE_ENABLED = None
@@ -2968,7 +2969,11 @@ def indexing_key_expand_implicit_axes(key, shape):
         else:
             if idx is None:
                 num_none += 1
-            nonell_key.append(idx)
+            if isinstance(idx, NDArrayBase) and idx.ndim == 0:
+                # This handles ndarray of zero dim. e.g array(1)
+                nonell_key.append(idx.item())
+            else:
+                nonell_key.append(idx)
 
     nonell_key = tuple(nonell_key)
 
@@ -3045,6 +3050,8 @@ def get_indexing_dispatch_code(key):
 
     for idx in key:
         if isinstance(idx, (NDArray, np.ndarray, list, tuple)):
+            if isinstance(idx, tuple) and len(idx) == 0:
+                return _NDARRAY_EMPTY_TUPLE_INDEXING
             if getattr(idx, 'dtype', None) == np.bool_:
                 num_bools += 1
             basic_indexing = False

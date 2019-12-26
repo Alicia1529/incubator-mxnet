@@ -602,6 +602,30 @@ def test_np_ndarray_copy():
 
 
 @with_seed()
+def test_formatting():
+    def test_0d():
+        a = np.array(np.pi)
+        _a = a.asnumpy()
+        assert '{:0.3g}'.format(a) == '{:0.3g}'.format(_a)
+        assert '{:0.3g}'.format(a[()]) == '{:0.3g}'.format(_a[()])
+
+    def test_nd_format():
+        a = np.array([np.pi])
+        assert_exception('{:30}'.format, TypeError, a)
+
+    def test_nd_no_format():
+        a = np.array([np.pi])
+        _a = a.asnumpy()
+        assert '{}'.format(a) == '{}'.format(_a)
+        b = np.arange(8).reshape(2,2,2)
+        assert '{}'.format(a) == '{}'.format(_a)
+
+    test_0d()
+    test_nd_format()
+    test_nd_no_format()
+
+
+@with_seed()
 @use_np
 def test_np_ndarray_indexing():
     def np_int(index, int_type=np.int32):
