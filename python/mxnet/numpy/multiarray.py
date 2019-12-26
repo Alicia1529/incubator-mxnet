@@ -66,7 +66,7 @@ _NDARRAY_UNSUPPORTED_INDEXING = -1
 _NDARRAY_BASIC_INDEXING = 0
 _NDARRAY_ADVANCED_INDEXING = 1
 _NDARRAY_EMPTY_TUPLE_INDEXING = 2
-_NDARRAY_SINGLE_BOOLEAN_INDEXING = 3
+_NDARRAY_BOOLEAN_INDEXING = 3
 _NDARRAY_INT_BOOLEAN_INDEXING = 4
 _NDARRAY_SLICE_BOOLEAN_INDEXING = 5
 
@@ -343,14 +343,10 @@ class ndarray(NDArray):
         value_nd = self._prepare_value_nd(value, bcast_shape=vshape, squeeze_axes=new_axes)
         self._scatter_set_nd(value_nd, idcs)
 
-    def _is_basic_boolean_indexing(self, key):
-        """Check boolean indexing type arr[bool], arr[1, bool, 4], or arr[:, bool, :]
-           return bool, type, position"""
-        if isinstance(key, ndarray) and key.dtype == _np.bool_:  # boolean indexing
-            return True, _NDARRAY_SINGLE_BOOLEAN_INDEXING, 0
-        elif not isinstance(key, tuple):
-            return False, _NDARRAY_UNSUPPORTED_INDEXING, 0
-        num_bool = 0
+    def _check_boolean_indexing_type(self, key):
+        """Check boolean indexing type arr[bool, :, :], arr[1, bool, 4], or arr[:, bool, :]
+           return bool_type, bool_position"""
+
         dim = len(key)
         rest_int = True
         rest_full_slice = True
@@ -359,7 +355,6 @@ class ndarray(NDArray):
             if isinstance(key[idx], _np.ndarray) and key[idx].dtype == _np.bool_:
                 key[idx] = array(key[idx], dtype='bool', ctx=self.ctx)
             if isinstance(key[idx], ndarray) and key[idx].dtype == _np.bool_:
-                num_bool += 1
                 pos = idx
             elif isinstance(key[idx], integer_types):
                 rest_full_slice = False
@@ -367,15 +362,15 @@ class ndarray(NDArray):
                 rest_int = False
             # not arr[:, bool, :] format slicing or not arr[3,bool,4]
             else:
-                return False, _NDARRAY_UNSUPPORTED_INDEXING, pos
+                raise TypeError('ndarray boolean indexing does not support slicing '
+                                'with key {} of type {}'.format(idx, type(idx))
+                )
 
-        if num_bool == 1 and rest_int:
-            return True, _NDARRAY_INT_BOOLEAN_INDEXING, pos
-        elif num_bool == 1 and rest_full_slice:
-            return True, _NDARRAY_SLICE_BOOLEAN_INDEXING, pos
-        elif num_bool > 2:
-            raise NotImplementedError("Do not support more than two boolean arrays as part of indexing")
-        return False, _NDARRAY_UNSUPPORTED_INDEXING, pos
+        if rest_int:
+            return _NDARRAY_INT_BOOLEAN_INDEXING, pos
+        elif rest_full_slice:
+            return _NDARRAY_SLICE_BOOLEAN_INDEXING, pos
+        raise NotImplementedError("Do not support {} as key for boolean indexing".format(key))
 
     @staticmethod
     def _calculate_new_idx(key, shape, mask_pos, mask_ndim): # pylint: disable=redefined-outer-name
@@ -386,18 +381,15 @@ class ndarray(NDArray):
             step *= shape[idx+mask_ndim-1]
         return new_idx
 
-    def _get_boolean_indexing(self, key, pos, bool_type):
-        if bool_type == _NDARRAY_SINGLE_BOOLEAN_INDEXING:
+    def _get_np_boolean_indexing(self, key):
+        if not isinstance(key, tuple):
             key = (key,)
-            bool_type = _NDARRAY_SLICE_BOOLEAN_INDEXING
+        bool_type, pos = self._check_boolean_indexing_type(key)
 
         from functools import reduce
         mask_shape = key[pos].shape
         mask_ndim = len(mask_shape)
         ndim = len(self.shape)
-        if len(key) + mask_ndim - 1 > ndim:
-            raise IndexError('too many indices, whose ndim = {}, for array with ndim = {}'
-                             .format(len(key) + mask_ndim - 1, ndim))
         for i in range(mask_ndim):
             if key[pos].shape[i] != self.shape[pos + i]:
                 raise IndexError('boolean index did not match indexed array along axis {};'
@@ -437,17 +429,14 @@ class ndarray(NDArray):
 
         raise NotImplementedError("This boolean indexing type is not supported.")
 
-    def _set_boolean_indexing(self, key, pos, bool_type, value):
-        if bool_type == _NDARRAY_SINGLE_BOOLEAN_INDEXING:
+    def _set_np_boolean_indexing(self, key, value):
+        if not isinstance(key, tuple):
             key = (key,)
-            bool_type = _NDARRAY_SLICE_BOOLEAN_INDEXING
+        bool_type, pos = self._check_boolean_indexing_type(key)
 
         mask = key[pos]
         mask_shape = mask.shape
         mask_ndim = len(mask_shape)
-        if len(key) + mask_ndim - 1 > self.ndim:
-            raise IndexError('too many indices, whose ndim = {}, for array with ndim = {}'
-                             .format(len(key) + mask_ndim - 1, self.ndim))
         for i in range(mask_ndim):
             if mask_shape[i] != self.shape[pos + i]:
                 raise IndexError('boolean index did not match indexed array along axis {};'
@@ -620,10 +609,6 @@ class ndarray(NDArray):
                 raise TypeError('{}'.format(str(err)))
         if isinstance(key, _np.ndarray) and key.dtype == _np.bool_:
             key = array(key, dtype='bool', ctx=self.ctx)
-        # boolean indexing
-        basic_bool, bool_type, pos = self._is_basic_boolean_indexing(key)
-        if basic_bool is True:
-            return self._get_boolean_indexing(key, pos, bool_type)
 
         if ndim == 0:
             if key == 0:
@@ -653,7 +638,8 @@ class ndarray(NDArray):
                     return self
             elif key.step == 0:
                 raise ValueError("slice step cannot be zero")
-
+        
+        key_before_expaned = key
         key = indexing_key_expand_implicit_axes(key, self.shape)
         indexing_dispatch_code = get_indexing_dispatch_code(key)
         if indexing_dispatch_code == _NDARRAY_BASIC_INDEXING:
@@ -662,6 +648,8 @@ class ndarray(NDArray):
             return self._get_np_empty_tuple_indexing(key)
         elif indexing_dispatch_code == _NDARRAY_ADVANCED_INDEXING:
             return self._get_np_advanced_indexing(key)
+        elif indexing_dispatch_code == _NDARRAY_BOOLEAN_INDEXING:
+            return self._get_np_boolean_indexing(key_before_expaned)
         else:
             raise RuntimeError
 
@@ -715,12 +703,6 @@ class ndarray(NDArray):
         """
         if isinstance(value, NDArray) and not isinstance(value, ndarray):
             raise TypeError('Cannot assign mx.nd.NDArray to mxnet.numpy.ndarray')
-
-        # handle boolean indexing
-        basic_bool, bool_type, pos = self._is_basic_boolean_indexing(key)
-        if basic_bool is True:
-            return self._set_boolean_indexing(key, pos, bool_type, value)
-
         # handle basic and advanced indexing
         if self.ndim == 0:
             if not isinstance(key, tuple) or len(key) != 0:
@@ -738,6 +720,7 @@ class ndarray(NDArray):
             else:
                 raise ValueError('setting an array element with a sequence.')
         else:
+            key_before_expaned = key
             key = indexing_key_expand_implicit_axes(key, self.shape)
             slc_key = tuple(idx for idx in key if idx is not None)
             if len(slc_key) < self.ndim:
@@ -758,6 +741,8 @@ class ndarray(NDArray):
                 pass # no action needed
             elif indexing_dispatch_code == _NDARRAY_ADVANCED_INDEXING:
                 self._set_np_advanced_indexing(key, value)
+            elif indexing_dispatch_code == _NDARRAY_BOOLEAN_INDEXING:
+                return self._set_np_boolean_indexing(key_before_expaned, value)
             else:
                 raise ValueError(
                     'Indexing NDArray with index {} of type {} is not supported'

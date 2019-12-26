@@ -111,6 +111,7 @@ _NDARRAY_UNSUPPORTED_INDEXING = -1
 _NDARRAY_BASIC_INDEXING = 0
 _NDARRAY_ADVANCED_INDEXING = 1
 _NDARRAY_EMPTY_TUPLE_INDEXING = 2
+_NDARRAY_BOOLEAN_INDEXING = 3
 
 # Caching whether MXNet was built with INT64 support or not
 _INT64_TENSOR_SIZE_ENABLED = None
@@ -2952,7 +2953,6 @@ def indexing_key_expand_implicit_axes(key, shape):
     """
     if not isinstance(key, tuple):
         key = (key,)
-
     # We need to loop explicitly since tuple functions like `index()` or
     # `count()` use `==` internally, which doesn't play well with fancy
     # indexing.
@@ -2969,8 +2969,9 @@ def indexing_key_expand_implicit_axes(key, shape):
         else:
             if idx is None:
                 num_none += 1
-            if isinstance(idx, NDArrayBase) and idx.ndim == 0:
+            if isinstance(idx, NDArrayBase) and idx.ndim == 0 and idx.dtype != np.bool_:
                 # This handles ndarray of zero dim. e.g array(1)
+                # while advoid converting zero dim boolean array
                 nonell_key.append(idx.item())
             else:
                 nonell_key.append(idx)
@@ -3062,13 +3063,14 @@ def get_indexing_dispatch_code(key):
                 'NDArray does not support slicing with key {} of type {}.'
                 ''.format(idx, type(idx))
             )
-
     if basic_indexing and num_bools == 0:
         return _NDARRAY_BASIC_INDEXING
     elif not basic_indexing and num_bools == 0:
         return _NDARRAY_ADVANCED_INDEXING
+    elif num_bools == 1:
+        return _NDARRAY_BOOLEAN_INDEXING
     else:
-        raise TypeError('ndarray indexing does not support boolean ndarray'
+        raise TypeError('ndarray indexing does not more than one boolean ndarray'
                         ' in a tuple of complex indices.')
 
 
