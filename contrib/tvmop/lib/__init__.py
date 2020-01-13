@@ -1,3 +1,4 @@
+
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -15,5 +16,4 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# from . import umath, fromnumeric, multiarray
-from . import umath
+from . import polynomial
