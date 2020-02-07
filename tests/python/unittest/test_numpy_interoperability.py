@@ -1664,6 +1664,19 @@ def _add_workload_nonzero():
     OpArgMngr.add_workload('nonzero', np.array([False, False, False], dtype=np.bool_))
     OpArgMngr.add_workload('nonzero', np.array([True, False, False], dtype=np.bool_))
 
+
+def _add_workload_count_nonzero():
+    OpArgMngr.add_workload('count_nonzero', np.random.randint(-1, 1))
+    OpArgMngr.add_workload('count_nonzero', np.random.randint(-1, 1, size=()), axis=None)
+    OpArgMngr.add_workload('count_nonzero', np.random.randint(-2, 2, size=(0, 1, 0)))
+    OpArgMngr.add_workload('count_nonzero', np.random.randint(-2, 2, size=(2, 3, 4)), axis=0)
+    OpArgMngr.add_workload('count_nonzero', np.random.randint(-2, 2, size=(2, 3, 4)), axis=1)
+    OpArgMngr.add_workload('count_nonzero', np.random.randint(-2, 2, size=(2, 3, 4)), axis=2)
+    OpArgMngr.add_workload('count_nonzero', np.random.randint(-2, 2, size=(2, 3, 4)), axis=(0,1))
+    OpArgMngr.add_workload('count_nonzero', np.array([False, False, False], dtype=np.bool_))
+    OpArgMngr.add_workload('count_nonzero', np.array([True, False, False], dtype=np.bool_))
+
+
 def _add_workload_diagflat():
     def get_mat(n):
         data = _np.arange(n)

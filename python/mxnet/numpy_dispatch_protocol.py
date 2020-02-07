@@ -113,6 +113,7 @@ _NUMPY_ARRAY_FUNCTION_LIST = [
     'min',
     'amin',
     'nonzero',
+    'count_nonzero',
     'ones_like',
     'atleast_1d',
     'atleast_2d',
