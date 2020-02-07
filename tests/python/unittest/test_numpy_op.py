@@ -5881,6 +5881,60 @@ def test_np_nonzero():
 
 @with_seed()
 @use_np
+def test_np_count_nonzero():
+    class TestCountNonzero(HybridBlock):
+        def __init__(self, axis=None):
+            super(TestCountNonzero, self).__init__()
+            self._axis = axis
+
+        def hybrid_forward(self, F, x):
+            return F.np.count_nonzero(x, axis=self._axis)
+
+    hybridize_list = [False]
+    # type_list = [_np.bool, 'int32', 'int64', 'float64', 'float32', 'float16']
+    type_list = ['float32']
+    shape_axis_list = [
+        # ((), None),
+        # ((3, 4), None),
+        # ((4, 4), 0),
+        # ((3, 4), 1),
+        
+        # ((5, 0), ()),
+        # ((5, 0), None),
+        # ((3, 4, 5), ()),
+        # ((3, 4, 5), None),
+        # ((3, 4, 5), -2),
+        # ((3, 4, 5), (0, 1)),
+        # ((4, 0, 6), None),
+        ((4, 0, 6), 2)
+        ]
+    rtol, atol = 1e-3, 1e-5
+    for [hybridize, dtype, shape_axis] in itertools.product(hybridize_list, type_list, shape_axis_list):
+        shape, axis = shape_axis
+        # test_count_nonzero = TestCountNonzero(axis=axis)
+        # if hybridize:
+        #     test_count_nonzero.hybridize()
+        x = np.random.randint(-1, 1, size=shape).astype(dtype)
+        # print(hybridize, dtype, shape_axis)
+        print(x.asnumpy())
+        np_out = _np.count_nonzero(x.asnumpy(), axis=axis)
+        # mx_out = test_count_nonzero(x)
+        print("size", x.size, 'dtype', dtype, 'axis', axis)
+        print("np_out", np_out, type(np_out))
+        # print('mx_out: shape, size', mx_out.shape, mx_out.size)
+        # print("mx_out", mx_out, type(mx_out))
+        
+        # # assert_almost_equal(mx_out.asnumpy(), np_out, rtol, atol)
+
+        # Test imperative once again
+        mx_out = np.count_nonzero(x, axis=axis)
+        np_out = _np.count_nonzero(x.asnumpy(), axis=axis)
+        assert_almost_equal(mx_out.asnumpy(), np_out, rtol, atol)
+        print()
+
+
+@with_seed()
+@use_np
 def test_np_unique():
     class TestUnique(HybridBlock):
         def __init__(self, return_index=False, return_inverse=False, return_counts=False, axis=None):

@@ -63,9 +63,9 @@ __all__ = ['ndarray', 'empty', 'empty_like', 'array', 'shape',
            'fliplr', 'around', 'round', 'arctan2', 'hypot',
            'bitwise_and', 'bitwise_xor', 'bitwise_or', 'rad2deg', 'deg2rad',
            'unique', 'lcm', 'tril', 'identity', 'take', 'ldexp', 'vdot', 'inner', 'outer', 'equal', 'not_equal',
-           'greater', 'less', 'greater_equal', 'less_equal', 'hsplit', 'rot90', 'einsum', 'true_divide', 'nonzero',
-           'quantile', 'percentile', 'shares_memory', 'may_share_memory', 'diff', 'resize', 'nan_to_num', 'where',
-           'bincount']
+           'greater', 'less', 'greater_equal', 'less_equal', 'hsplit', 'rot90', 'einsum', 'true_divide',
+           'nonzero', 'count_nonzero', 'quantile', 'percentile', 'shares_memory', 'may_share_memory',
+           'diff', 'resize', 'nan_to_num', 'where', 'bincount']
 
 __all__ += fallback.__all__
 
@@ -8042,6 +8042,55 @@ def nonzero(a):
     (array([1, 1, 1, 2, 2, 2], dtype=int64), array([0, 1, 2, 0, 1, 2], dtype=int64))
     """
     return _mx_nd_np.nonzero(a)
+
+
+@set_module('mxnet.numpy')
+def count_nonzero(a, axis=None):
+    """
+    Counts the number of non-zero values in the array ``a``.
+
+    The word "non-zero" is in reference to the Python 2.x
+    built-in method ``__nonzero__()`` (renamed ``__bool__()``
+    in Python 3.x) of Python objects that tests an object's
+    "truthfulness". For example, any number is considered
+    truthful if it is nonzero, whereas any string is considered
+    truthful if it is not the empty string. Thus, this function
+    (recursively) counts how many elements in ``a`` (and in
+    sub-arrays thereof) have their ``__nonzero__()`` or ``__bool__()``
+    method evaluated to ``True``.
+
+    Parameters
+    ----------
+    a : ndarray
+        The array for which to count non-zeros.
+    axis : int or tuple, optional
+        Axis or tuple of axes along which to count non-zeros.
+        Default is None, meaning that non-zeros will be counted
+        along a flattened version of ``a``.
+
+    Returns
+    -------
+    count : scalar or array of int
+        Number of non-zero values in the array along a given axis.
+        Otherwise, the total number of non-zero values in the array
+        is returned.
+
+    See Also
+    --------
+    nonzero : Return the coordinates of all the non-zero values.
+
+    Examples
+    --------
+    >>> np.count_nonzero(np.eye(4))
+    array(4, dtype=int64)
+    >>> np.count_nonzero(np.array([[0,1,7,0,0],[3,0,0,2,19]]))
+    array(5, dtype=int64)
+    >>> np.count_nonzero(np.array([[0,1,7,0,0],[3,0,0,2,19]]), axis=0)
+    array([1, 1, 1, 1, 1], dtype=int64)
+    >>> np.count_nonzero(np.array([[0,1,7,0,0],[3,0,0,2,19]]), axis=1)
+    array([2, 3], dtype=int64)
+    """
+    return _mx_nd_np.count_nonzero(a, axis=axis)
 
 
 @set_module('mxnet.numpy')
