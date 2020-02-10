@@ -1787,6 +1787,20 @@ def _add_workload_isinf():
     OpArgMngr.add_workload('isinf', array3)
 
 
+def _add_workload_polyval():
+    p1 = np.arange(20)
+    p2 = np.arange(1)
+    x1 = np.arange(20)
+    x2 = np.ones((3,3))
+    x3 = np.array(2)
+    OpArgMngr.add_workload('polyval', p1, x1)
+    OpArgMngr.add_workload('polyval', p1, x2)
+    OpArgMngr.add_workload('polyval', p1, x3)
+    OpArgMngr.add_workload('polyval', p2, x1)
+    OpArgMngr.add_workload('polyval', p2, x2)
+    OpArgMngr.add_workload('polyval', p2, x3)
+
+
 def _add_workload_linalg_cond():
     A = np.array([[1., 0, 1], [0, -2., 0], [0, 0, 3.]])
     OpArgMngr.add_workload('linalg.cond', A, np.inf)
@@ -1971,6 +1985,7 @@ def _prepare_workloads():
     _add_workload_nan_to_num()
     _add_workload_isnan()
     _add_workload_isinf()
+    _add_workload_polyval()
     _add_workload_heaviside()
     _add_workload_spacing()
 
