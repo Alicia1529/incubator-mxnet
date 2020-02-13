@@ -44,7 +44,7 @@ __all__ = ['shape', 'zeros', 'zeros_like', 'ones', 'ones_like', 'full', 'full_li
            'tril', 'identity', 'take', 'ldexp', 'vdot', 'inner', 'outer',
            'equal', 'not_equal', 'greater', 'less', 'greater_equal', 'less_equal', 'hsplit', 'rot90', 'einsum',
            'true_divide', 'nonzero', 'quantile', 'percentile', 'shares_memory', 'may_share_memory',
-           'diff', 'resize', 'nan_to_num', 'isnan', 'isinf', 'where', 'bincount']
+           'diff', 'resize', 'nan_to_num', 'isnan', 'isinf', 'where', 'ediff1d', 'bincount']
 
 
 @set_module('mxnet.ndarray.numpy')
@@ -6821,6 +6821,68 @@ def where(condition, x=None, y=None):  # pylint: disable=too-many-return-stateme
             else:
                 raise TypeError('type {0} and {1} not supported'.format(str(type(x)), str(type(y))))
 
+
+@set_module('mxnet.ndarray.numpy')
+def ediff1d(ary, to_end=None, to_begin=None):
+    """
+    The differences between consecutive elements of an array.
+
+    Parameters
+    ----------
+    ary : array_like
+        If necessary, will be flattened before the differences are taken.
+    to_end : array_like, optional
+        Number(s) to append at the end of the returned differences.
+    to_begin : array_like, optional
+        Number(s) to prepend at the beginning of the returned differences.
+
+    Returns
+    -------
+    ediff1d : ndarray
+        The differences. Loosely, this is ``ary.flat[1:] - ary.flat[:-1]``.
+
+    See Also
+    --------
+    diff, gradient
+
+    Notes
+    -----
+    When applied to masked arrays, this function drops the mask information
+    if the `to_begin` and/or `to_end` parameters are used.
+
+    Examples
+    --------
+    >>> x = np.array([1, 2, 4, 7, 0])
+    >>> np.ediff1d(x)
+    array([ 1,  2,  3, -7])
+
+    >>> np.ediff1d(x, to_begin=-99, to_end=np.array([88, 99]))
+    array([-99,   1,   2, ...,  -7,  88,  99])
+
+    The returned array is always 1D.
+
+    >>> y = [[1, 2, 4], [1, 6, 24]]
+    >>> np.ediff1d(y)
+    array([ 1,  2, -3,  5, 18])
+    """
+    from ...numpy import ndarray as np_ndarray
+    input_type = (isinstance(to_begin, np_ndarray), isinstance(to_end, np_ndarray))
+    # case 1: when both `to_begin` and `to_end` are arrays
+    if input_type == (True, True):
+        return _npi.ediff1d(ary, to_begin, to_end, to_begin_arr_given=True, to_end_arr_given=True,
+                            to_begin_scalar=None, to_end_scalar=None)
+    # case 2: only `to_end` is array but `to_begin` is scalar/None
+    elif input_type == (False, True):
+        return _npi.ediff1d(ary, to_end, to_begin_arr_given=False, to_end_arr_given=True,
+                            to_begin_scalar=to_begin, to_end_scalar=None)
+    # case 3: only `to_begin` is array but `to_end` is scalar/None
+    elif input_type == (True, False):
+        return _npi.ediff1d(ary, to_begin, to_begin_arr_given=True, to_end_arr_given=False,
+                            to_begin_scalar=None, to_end_scalar=to_end)
+    # case 4: both `to_begin` and `to_end` are scalar/None
+    else:
+        return _npi.ediff1d(ary, to_begin_given=False, to_end_given=False,
+                            to_begin_scalar=None, to_end_scalar=to_end)
 
 @set_module('mxnet.ndarray.numpy')
 def bincount(x, weights=None, minlength=0):
