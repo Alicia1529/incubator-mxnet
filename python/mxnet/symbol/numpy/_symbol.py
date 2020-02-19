@@ -6025,8 +6025,7 @@ def ediff1d(ary, to_end=None, to_begin=None):
     --------
     diff, gradient
     """
-    from ._symbol import _Symbol as np_symbol
-    input_type = (isinstance(to_begin, np_symbol), isinstance(to_end, np_symbol))
+    input_type = (isinstance(to_begin, _Symbol), isinstance(to_end, _Symbol))
     # case 1: when both `to_begin` and `to_end` are arrays
     if input_type == (True, True):
         return _npi.ediff1d(ary, to_begin, to_end, to_begin_arr_given=True, to_end_arr_given=True,

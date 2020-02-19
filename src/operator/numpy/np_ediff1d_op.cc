@@ -98,6 +98,107 @@ inline bool EDiff1DShape(const nnvm::NodeAttrs& attrs,
   return shape_is_known(out_attrs->at(0));
 }
 
+void EDiff1DForwardCPU(const nnvm::NodeAttrs& attrs,
+                       const OpContext& ctx,
+                       const std::vector<TBlob>& inputs,
+                       const std::vector<OpReqType>& req,
+                       const std::vector<TBlob>& outputs) {
+  using namespace mshadow;
+  using namespace mxnet_op;
+  CHECK_GE(inputs.size(), 1U);
+  CHECK_LE(inputs.size(), 3U);
+  CHECK_EQ(req.size(), 1U);
+  CHECK_EQ(outputs.size(), 1U);
+  const TBlob& in_data = inputs[0];
+  const TBlob& out_data = outputs[0];
+  mshadow::Stream<cpu> *s = ctx.get_stream<cpu>();
+  MSHADOW_TYPE_SWITCH(out_data.type_flag_, DType, {
+    const EDiff1DParam& param = nnvm::get<EDiff1DParam>(attrs.parsed);
+    size_t padding = 0;
+    size_t in_size = (in_data.Size() > 0)? in_data.Size() - 1: 0;
+    index_t idx = 1;  // used to index the rest of input arrays
+
+    if (param.to_begin_arr_given) {
+      // if the `to_begin` parameter is an array, copy its values to the beginning of the out array
+      memcpy(out_data.dptr<DType>(), inputs[idx].dptr<DType>(),
+             inputs[idx].Size() * sizeof(DType));
+      padding += inputs[idx].Size();
+      idx += 1;
+    } else if (param.to_begin_scalar.has_value()) {
+      // if the `to_begin` parameter is a scalar, directly assign its value
+      out_data.dptr<DType>()[0] = param.to_begin_scalar.value();
+      padding += 1;
+    }
+
+    if (param.to_end_arr_given) {
+      // if the `to_end` parameter is an array, copy its values to the end of the out array
+      memcpy(out_data.dptr<DType>() + padding + in_size, inputs[idx].dptr<DType>(),
+             inputs[idx].Size() * sizeof(DType));
+    } else if (param.to_end_scalar.has_value()) {
+      // if the `to_end` parameter is a scalar, directly assign its value
+      out_data.dptr<DType>()[padding + in_size] = param.to_end_scalar.value();
+    }
+
+    MXNET_ASSIGN_REQ_SWITCH(req[0], req_type, {
+      Kernel<ediff1d_forward<req_type>, cpu>::Launch(
+        s, in_size, out_data.dptr<DType>(), in_data.dptr<DType>(), padding);
+    });
+  });
+}
+
+void EDiff1DBackwardCPU(const nnvm::NodeAttrs& attrs, const OpContext& ctx,
+                        const std::vector<TBlob>& inputs,
+                        const std::vector<OpReqType>& req,
+                        const std::vector<TBlob>& outputs) {
+  using namespace mshadow;
+  using namespace mxnet_op;
+  CHECK_GE(inputs.size(), 2U);
+  CHECK_LE(inputs.size(), 4U);
+  CHECK_GE(outputs.size(), 1U);
+  CHECK_LE(outputs.size(), 3U);
+  CHECK_EQ(req.size(), outputs.size());
+
+  mshadow::Stream<cpu> *s = ctx.get_stream<cpu>();
+  const EDiff1DParam& param = nnvm::get<EDiff1DParam>(attrs.parsed);
+
+  const TBlob& ograd = inputs[0];
+  const TBlob& input = inputs[1];
+  const TBlob& igrad = outputs[0];
+  size_t in_size = (input.Size() > 0)? input.Size() - 1: 0;
+
+  MSHADOW_REAL_TYPE_SWITCH(ograd.type_flag_, DType, {
+    MXNET_ASSIGN_REQ_SWITCH(req[0], req_type, {
+      size_t padding = 0;
+      index_t idx = 1;  // start from the second argument of `outputs`
+      if (param.to_begin_arr_given) {
+        memcpy(outputs[idx].dptr<DType>(),
+               ograd.dptr<DType>(),
+               outputs[idx].Size() * sizeof(DType));
+        padding += outputs[idx].Size();
+        idx += 1;
+      } else if (param.to_begin_scalar.has_value()) {
+        padding += 1;
+      }
+
+      if (param.to_end_arr_given) {
+        memcpy(outputs[idx].dptr<DType>(),
+               ograd.dptr<DType>()+ in_size + padding,
+               outputs[idx].Size() * sizeof(DType));
+      }
+
+      if (input.Size() == 0) return;
+      if (input.Size() == 1) {
+        igrad.dptr<DType>()[0] = 0;
+      } else {
+        Kernel<ediff1d_backward_arr<req_type>, cpu>::Launch(
+          s, igrad.Size(), igrad.dptr<DType>(),
+          input.dptr<DType>(), ograd.dptr<DType>(),
+          padding, igrad.Size());
+      }
+    });
+  });
+}
+
 DMLC_REGISTER_PARAMETER(EDiff1DParam);
 
 NNVM_REGISTER_OP(_npi_ediff1d)
@@ -123,7 +224,7 @@ NNVM_REGISTER_OP(_npi_ediff1d)
   })
 .set_attr<mxnet::FInferShape>("FInferShape",  EDiff1DShape)
 .set_attr<nnvm::FInferType>("FInferType", EDiff1DType)
-.set_attr<FCompute>("FCompute<cpu>", EDiff1DForward<cpu>)
+.set_attr<FCompute>("FCompute<cpu>", EDiff1DForwardCPU)
 .set_attr<nnvm::FGradient>("FGradient", ElemwiseGradUseIn{"_npi_backward_ediff1d"})
 .set_attr<nnvm::FInplaceOption>("FInplaceOption",
   [](const NodeAttrs& attrs) {
@@ -153,7 +254,7 @@ NNVM_REGISTER_OP(_npi_backward_ediff1d)
      return num_inputs;
   })
 .set_attr<nnvm::TIsBackward>("TIsBackward", true)
-.set_attr<mxnet::FCompute>("FCompute<cpu>", EDiff1DBackward<cpu>);
+.set_attr<mxnet::FCompute>("FCompute<cpu>", EDiff1DBackwardCPU);
 
 }  // namespace op
 }  // namespace mxnet
