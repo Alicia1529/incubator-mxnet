@@ -212,9 +212,7 @@ def zeros_like(a, dtype=None, order='C', ctx=None, out=None):
     """
     if order != 'C':
         raise NotImplementedError
-    if ctx is None:
-        ctx = current_context()
-    return _npi.full_like(a, fill_value=0, dtype=dtype, ctx=ctx, out=out)
+    return full_like(a, 0, dtype=dtype, order=order, ctx=ctx, out=out)
 
 
 @set_module('mxnet.ndarray.numpy')
@@ -270,11 +268,7 @@ def ones_like(a, dtype=None, order='C', ctx=None, out=None):
     >>> np.ones_like(y)
     array([1., 1., 1.], dtype=float64)
     """
-    if order != 'C':
-        raise NotImplementedError
-    if ctx is None:
-        ctx = current_context()
-    return _npi.full_like(a, fill_value=1, dtype=dtype, ctx=ctx, out=out)
+    return full_like(a, 1, dtype=dtype, order=order, ctx=ctx, out=out)
 
 
 @set_module('mxnet.ndarray.numpy')
@@ -434,10 +428,14 @@ def full_like(a, fill_value, dtype=None, order='C', ctx=None, out=None): # pylin
     if order != 'C':
         raise NotImplementedError
     if ctx is None:
-        ctx = current_context()
+        ctx = str(current_context())
+    else:
+        ctx = str(ctx)
+    if dtype is not None and not isinstance(dtype, str):
+        dtype = _np.dtype(dtype).name
     if isinstance(fill_value, bool):
         fill_value = int(fill_value)
-    return _npi.full_like(a, fill_value=fill_value, dtype=dtype, ctx=ctx, out=out)
+    return _api_internal.full_like(a, fill_value, dtype, ctx, out)
 
 
 @set_module('mxnet.ndarray.numpy')

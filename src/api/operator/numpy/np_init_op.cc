@@ -23,6 +23,7 @@
  */
 #include "../utils.h"
 #include "../../../operator/tensor/init_op.h"
+#include <dmlc/optional.h>
 
 namespace mxnet {
 
@@ -49,6 +50,35 @@ MXNET_REGISTER_API("_npi.zeros")
   }
   int num_outputs = 0;
   auto ndoutputs = Invoke<op::InitOpParam>(op, &attrs, 0, nullptr, &num_outputs, nullptr);
+  *ret = ndoutputs[0];
+});
+
+MXNET_REGISTER_API("_npi.full_like")
+.set_body([](runtime::MXNetArgs args, runtime::MXNetRetValue* ret) {
+  using namespace runtime;
+  const nnvm::Op* op = Op::Get("_npi_full_like");
+  nnvm::NodeAttrs attrs;
+  op::FullLikeOpParam param;
+  param.fill_value = args[1].operator double();
+  // if (args[2].type_code() == kNull) {
+  //   param.dtype = dmlc::nullopt;
+  // } else {
+  //   param.dtype = dmlc::optional<int>(String2MXNetTypeWithBool(args[2].operator std::string()));
+  // }
+  if (args[2].type_code() == kNull) {
+    param.dtype = dmlc::nullopt;
+  } else {
+    param.dtype = String2MXNetTypeWithBool(args[2].operator std::string());
+  }
+  attrs.parsed = std::move(param);
+  attrs.op = op;
+  if (args[3].type_code() != kNull) {
+    attrs.dict["ctx"] = args[3].operator std::string();
+  }
+  int num_outputs = 1;
+  NDArray* out = args[4].operator mxnet::NDArray*();
+  NDArray* inputs[] = {args[0].operator mxnet::NDArray*()};
+  auto ndoutputs = Invoke<op::FullLikeOpParam>(op, &attrs, 1, inputs, &num_outputs, &out);
   *ret = ndoutputs[0];
 });
 

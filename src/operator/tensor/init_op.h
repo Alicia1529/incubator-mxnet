@@ -105,6 +105,13 @@ struct FullLikeOpParam : public dmlc::Parameter<FullLikeOpParam> {
       MXNET_ADD_ALL_TYPES_WITH_BOOL
       .describe("Target data type.");
   }
+  void SetAttrDict(std::unordered_map<std::string, std::string>* dict) {
+    std::ostringstream fill_value_s, dtype_s;
+    fill_value_s << fill_value;
+    dtype_s << dtype;
+    (*dict)["fill_value"] = fill_value_s.str();
+    (*dict)["dtype"] = dtype_s.str();
+  }
 };
 
 /*! \brief Infer type of FullLikeOpCompute*/
